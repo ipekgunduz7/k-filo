@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="dashboard-card text-center p-5">
+            <div class="icon-box bg-purple mx-auto mb-3" style="width: 70px; height: 70px; font-size: 2rem;"><i class="bi bi-file-earmark-text"></i></div>
+            <h5>Generate Custom Report</h5>
+            <p class="text-muted small">Create a PDF or Excel export for selected departments and date ranges.</p>
+            <a href="/export" class="btn btn-outline-primary rounded-pill">📥 Export Excel</a>
+            <a href="/download-pdf" class="btn btn-outline-danger rounded-pill mt-2 mt-md-0 ms-md-2">📄 Export PDF</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="dashboard-card p-4">
+            <h5 class="mb-3"><i class="bi bi-clock me-2"></i> Scheduled Reports</h5>
+            <div class="alert alert-info bg-opacity-10 border-0 d-flex align-items-center">
+                <i class="bi bi-info-circle fs-4 me-3"></i>
+                <div>Automated monthly reports are coming soon. You will be able to schedule reports directly to your email.</div>
+            </div>
+            <ul class="list-unstyled mt-3 small text-muted">
+                <li class="py-2 border-bottom"><i class="bi bi-check-circle-fill text-success me-2"></i> Monthly Department Usage</li>
+                <li class="py-2 border-bottom"><i class="bi bi-check-circle-fill text-success me-2"></i> Anomaly Summary</li>
+                <li class="py-2"><i class="bi bi-hourglass-split text-warning me-2"></i> Budget vs Actuals <span class="badge bg-secondary ms-2">Upcoming</span></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

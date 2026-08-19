@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Vehicles{% endblock %}
+{% block page_title %}🚙 Vehicles List{% endblock %}
+
+{% block content %}
+<div class="dashboard-card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="search-box" style="max-width: 550px; width: 100%;">
+    <input type="text" id="searchBox" class="form-control rounded-pill bg-light border-0 shadow-sm" style="padding: 10px 20px;" placeholder="Search plate, brand, model, department...">
+</div>
+        <span class="text-muted small">Total: {{ vehicles|length }} vehicles</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-modern table-hover" id="vehicleTable">
+            <thead><tr><th>Plate</th><th>Brand</th><th>Model</th><th>Department</th><th></th></tr></thead>
+            <tbody>
+                {% for v in vehicles %}
+                <tr style="cursor: pointer;" onclick="window.location='{{ url_for('vehicle_detail', vehicle_id=v['VehicleID']) }}'">
+                    <td class="fw-bold text-primary">{{ v['PlateNumber'] }}</td>
+                    <td>{{ v['Brand'] }}</td>
+                    <td>{{ v['Model'] }}</td>
+                    <td><span class="badge bg-light text-dark border">{{ v['DepartmentName'] }}</span></td>
+                    <td><a href="{{ url_for('vehicle_detail', vehicle_id=v['VehicleID']) }}" class="btn btn-sm btn-outline-primary rounded-pill" onclick="event.stopPropagation();">Details</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('searchBox').addEventListener('keyup', function() {
+        const filter = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#vehicleTable tbody tr');
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        });
+    });
+</script>
+{% endblock %}

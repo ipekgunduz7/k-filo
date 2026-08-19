@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block page_title %}🛡️ Admin Panel{% endblock %}
+
+{% block content %}
+<!-- Admin KPI Kartları (Dashboard tarzında) -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Top Consumer</span>
+                    <h3>{{ top_department['name'] if top_department else 'N/A' }}</h3>
+                </div>
+                <div class="icon-box bg-orange"><i class="bi bi-trophy-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Total Departments</span>
+                    <h3>{{ total_departments }}</h3>
+                </div>
+                <div class="icon-box bg-green"><i class="bi bi-buildings-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Total Users</span>
+                    <h3>{{ total_users }}</h3>
+                </div>
+                <div class="icon-box bg-purple"><i class="bi bi-people-fill"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Tabs -->
+<div class="dashboard-card p-0 overflow-hidden">
+    <ul class="nav nav-tabs px-3 pt-3 border-0" id="adminTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#users">👥 Users</button></li>
+        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#departments">🏢 Departments</button></li>
+        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#vehicles">🚗 Vehicles</button></li>
+    </ul>
+    <div class="tab-content p-3">
+        <div class="tab-pane fade show active" id="users">
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="dashboard-card p-3 bg-light">
+                        <h6 class="fw-bold">➕ Add New User</h6>
+                        <form action="{{ url_for('admin_add_user') }}" method="post">
+                            <div class="mb-2"><label class="form-label small">Username</label><input type="text" class="form-control" name="username" required></div>
+                            <div class="mb-2"><label class="form-label small">Password</label><input type="password" class="form-control" name="password" required></div>
+                            <div class="mb-2"><label class="form-label small">Role</label><select class="form-select" name="role"><option value="admin">Admin</option><option value="viewer" selected>Viewer</option></select></div>
+                            <div class="mb-2"><label class="form-label small">Department</label><select class="form-select" name="department_id"><option value="">-- None --</option>{% for d in departments %}<option value="{{ d['DepartmentID'] }}">{{ d['DepartmentName'] }}</option>{% endfor %}</select></div>
+                            <button type="submit" class="btn btn-primary w-100">Create User</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table table-modern table-hover">
+                            <thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Department</th><th>Action</th></tr></thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>#{{ user['UserID'] }}</td>
+                                    <td class="fw-bold">{{ user['Username'] }}</td>
+                                    <td>{% if user['Role'] == 'admin' %}<span class="badge bg-danger">admin</span>{% else %}<span class="badge bg-secondary">viewer</span>{% endif %}</td>
+                                    <td>{% for d in departments %}{% if d['DepartmentID'] == user['DepartmentID'] %}{{ d['DepartmentName'] }}{% endif %}{% else %}N/A{% endfor %}</td>
+                                    <td><form action="{{ url_for('admin_delete_user', user_id=user['UserID']) }}" method="post" onsubmit="return confirm('Delete user?');"><button class="btn btn-sm btn-outline-danger rounded-pill"><i class="bi bi-trash"></i></button></form></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Departments and Vehicles tabs similar structure (kept short for brevity) -->
+        <div class="tab-pane fade" id="departments">
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="dashboard-card p-3 bg-light">
+                        <h6 class="fw-bold">➕ Add Department</h6>
+                        <form action="{{ url_for('admin_add_department') }}" method="post">
+                            <div class="mb-2"><label class="form-label small">Department Name</label><input type="text" class="form-control" name="name" required></div>
+                            <div class="mb-2"><label class="form-label small">Budget</label><input type="number" step="0.01" class="form-control" name="budget" value="0"></div>
+                            <button type="submit" class="btn btn-primary w-100">Add Department</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table table-modern table-hover">
+                            <thead><tr><th>ID</th><th>Name</th><th>Budget</th><th>Action</th></tr></thead>
+                            <tbody>
+                                {% for d in departments %}
+                                <tr>
+                                    <td>#{{ d['DepartmentID'] }}</td>
+                                    <td class="fw-bold">{{ d['DepartmentName'] }}</td>
+                                    <td>{{ d['Budget'] }}</td>
+                                    <td><form action="{{ url_for('admin_delete_department', dept_id=d['DepartmentID']) }}" method="post" onsubmit="return confirm('Delete department?');"><button class="btn btn-sm btn-outline-danger rounded-pill"><i class="bi bi-trash"></i></button></form></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="vehicles">
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="dashboard-card p-3 bg-light">
+                        <h6 class="fw-bold">➕ Add Vehicle</h6>
+                        <form action="{{ url_for('admin_add_vehicle') }}" method="post">
+                            <div class="mb-2"><label class="form-label small">Plate</label><input type="text" class="form-control" name="plate" required></div>
+                            <div class="mb-2"><label class="form-label small">Brand</label><input type="text" class="form-control" name="brand"></div>
+                            <div class="mb-2"><label class="form-label small">Model</label><input type="text" class="form-control" name="model"></div>
+                            <div class="mb-2"><label class="form-label small">Department</label><select class="form-select" name="department_id"><option value="">-- None --</option>{% for d in departments %}<option value="{{ d['DepartmentID'] }}">{{ d['DepartmentName'] }}</option>{% endfor %}</select></div>
+                            <button type="submit" class="btn btn-primary w-100">Add Vehicle</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table table-modern table-hover">
+                            <thead><tr><th>ID</th><th>Plate</th><th>Department</th><th>Action</th></tr></thead>
+                            <tbody>
+                                {% for v in vehicles %}
+                                <tr>
+                                    <td>#{{ v['VehicleID'] }}</td>
+                                    <td class="fw-bold text-primary">{{ v['PlateNumber'] }}</td>
+                                    <td>{{ v['DepartmentName'] }}</td>
+                                    <td><form action="{{ url_for('admin_delete_vehicle', vehicle_id=v['VehicleID']) }}" method="post" onsubmit="return confirm('Delete vehicle?');"><button class="btn btn-sm btn-outline-danger rounded-pill"><i class="bi bi-trash"></i></button></form></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

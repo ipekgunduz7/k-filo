@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}⚙️ Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5 class="mb-3">Profile Information</h5>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label small">Username</label>
+                    <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Current Password</label>
+                    <input type="password" class="form-control" name="current_password" placeholder="Enter current password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">New Password</label>
+                    <input type="password" class="form-control" name="new_password" placeholder="Enter new password">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Update Settings</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5 class="mb-3">System Preferences</h5>
+            <p class="text-muted small">Toggle Dark Mode instantly and set notification preferences.</p>
+            
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="darkModeToggle" onchange="toggleGlobalTheme(this.checked)">
+                <label class="form-check-label small fw-semibold" for="darkModeToggle">Dark Mode</label>
+            </div>
+            
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="emailNotif" checked>
+                <label class="form-check-label small" for="emailNotif">Email Notifications for Anomalies</label>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+<!-- İŞTE EKLENEN KISIM: Sayfa yenilendiğinde switch'i kayıtlı temaya göre ayarlar -->
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('darkModeToggle');
+        const savedTheme = localStorage.getItem('kfiloTheme');
+        
+        // Eğer kayıtlı tema dark ise, switch'i otomatik olarak işaretle (aç)
+        if (savedTheme === 'dark') {
+            toggle.checked = true;
+        } else {
+            toggle.checked = false;
+        }
+    });
+</script>
+{% endblock %}

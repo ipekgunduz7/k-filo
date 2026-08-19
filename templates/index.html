@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- KPI Cards (Canlı güncellenmesi için id'ler eklendi) -->
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Total Fuel</span>
+                    <h3 id="kpi-total-fuel">{{ total_fuel }} L</h3>
+                    <span class="badge-trend"><i class="bi bi-arrow-up-short"></i> +2.5%</span>
+                </div>
+                <div class="icon-box bg-green"><i class="bi bi-fuel-pump-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">CO₂ Emission</span>
+                    <h3 id="kpi-total-co2">{{ total_co2 }} kg</h3>
+                    <span class="badge-trend"><i class="bi bi-arrow-down-short"></i> -0.8%</span>
+                </div>
+                <div class="icon-box bg-pink"><i class="bi bi-cloud-fill"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Active Anomalies</span>
+                    <h3 id="kpi-active-anomalies">{{ active_anomalies }}</h3>
+                    <span class="badge-trend bg-warning bg-opacity-25 text-warning"><i class="bi bi-exclamation-triangle-fill"></i> High</span>
+                </div>
+                <div class="icon-box bg-orange"><i class="bi bi-shield-exclamation"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="text-muted small">Top Consumer</span>
+                    <h3 id="kpi-top-consumer">{{ top_department['name'] if top_department else 'N/A' }}</h3>
+                    <span class="badge-trend"><i class="bi bi-star-fill"></i> Dept. Lead</span>
+                </div>
+                <div class="icon-box bg-purple"><i class="bi bi-trophy-fill"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI & ML Insights -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="dashboard-card p-3">
+            <h6><i class="bi bi-magic text-primary me-2"></i>AI Fuel Forecast</h6>
+            {% if forecast %}
+                <div class="text-center mt-2">
+                    <h5 class="mb-0">{{ forecast['predicted_fuel'] }} Liters</h5>
+                    <small class="text-muted">Predicted for {{ forecast['next_month'] }}. Trend: {{ forecast['trend'] }}</small>
+                </div>
+            {% else %}
+                <p class="mb-0 text-muted">Not enough data for forecast yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="dashboard-card p-3">
+            <h6><i class="bi bi-robot text-warning me-2"></i>ML Anomaly Detection</h6>
+            {% if ml_anomalies %}
+                <ul class="list-unstyled mb-0 small">
+                    {% for ml in ml_anomalies[:3] %}
+                        <li class="py-1 border-bottom border-light"><span class="fw-bold">{{ ml['PlateNumber'] }}</span> ({{ ml['DepartmentName'] }}) - <span class="text-danger">{{ ml['AnomalyCount'] }} unusual records</span></li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="mb-0 text-muted">No ML based anomalies detected.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Tabs: Anomaly / Budget / Advanced -->
+<div class="dashboard-card mb-4 p-0 overflow-hidden">
+    <ul class="nav nav-tabs px-3 pt-3 border-0" id="anomalyTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#standard">🚨 Waste Alerts</button></li>
+        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#budget">💰 Budget Alerts</button></li>
+        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#advanced">📈 Advanced</button></li>
+    </ul>
+    <div class="tab-content p-3" id="anomalyTabsContent">
+        <div class="tab-pane fade show active" id="standard">
+            <div class="table-responsive">
+                <table class="table table-modern mb-0">
+                    <thead><tr><th>Plate</th><th>Department</th><th>Deviation</th></tr></thead>
+                    <tbody>
+                        {% for a in anomalies|sort(attribute='DeviationPercent', reverse=True) %}
+                        <tr><td>{{ a['PlateNumber'] }}</td><td>{{ a['DepartmentName'] }}</td><td class="text-danger fw-bold">{{ "%.2f"|format(a['DeviationPercent']) }}%</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="budget">
+            <div class="table-responsive">
+                <table class="table table-modern mb-0">
+                    <thead><tr><th>Department</th><th>Budget Used</th></tr></thead>
+                    <tbody>
+                        {% for b in budget_alerts|sort(attribute='BudgetUsedPercent', reverse=True) %}
+                        <tr><td>{{ b['DepartmentName'] }}</td><td class="text-warning fw-bold">{{ "%.2f"|format(b['BudgetUsedPercent']) }}%</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="advanced">
+            <div class="table-responsive">
+                <table class="table table-modern mb-0">
+                    <thead><tr><th>Plate</th><th>Department</th><th>Change</th></tr></thead>
+                    <tbody>
+                        {% for adv in advanced_anomalies|sort(attribute='ChangePercent', reverse=True) %}
+                        <tr><td>{{ adv['PlateNumber'] }}</td><td>{{ adv['DepartmentName'] }}</td><td class="text-info fw-bold">{{ adv['ChangePercent'] }}%</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts - 2x2 Grid -->
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <h6>Fuel by Department</h6>
+            <div class="chart-container"><canvas id="pieChart"></canvas></div>
+            <div class="insight-text mt-2 text-muted small">{{ insights.pie }}</div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <h6>Budget Utilization</h6>
+            <div class="chart-container"><canvas id="budgetChart"></canvas></div>
+            <div class="insight-text mt-2 text-muted small">{{ insights.budget }}</div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <h6>Monthly CO₂ Emission</h6>
+            <div class="chart-container"><canvas id="lineChart"></canvas></div>
+            <div class="insight-text mt-2 text-muted small">{{ insights.line }}</div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="dashboard-card">
+            <h6>Seasonal Fuel Trend</h6>
+            <div class="chart-container"><canvas id="seasonalChart"></canvas></div>
+            <div class="insight-text mt-2 text-muted small">{{ insights.seasonal }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-end gap-2 mt-4">
+    <a href="/export" class="btn btn-success btn-sm rounded-pill px-4"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    <a href="/download-pdf" class="btn btn-danger btn-sm rounded-pill px-4"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const departmentLabels = {{ department_labels|tojson }};
+    const departmentValues = {{ department_values|tojson }};
+    const budgetLabels = {{ budget_labels|tojson }};
+    const budgetValues = {{ budget_values|tojson }};
+    const carbonLabels = {{ carbon_labels|tojson }};
+    const carbonValues = {{ carbon_values|tojson }};
+    const seasonalLabels = {{ seasonal_labels|tojson }};
+    const seasonalValues = {{ seasonal_values|tojson }};
+
+    const pieChart = new Chart(document.getElementById('pieChart'), {
+        type: 'pie',
+        data: { labels: departmentLabels, datasets: [{ data: departmentValues, backgroundColor: ['#5856d6', '#28a745', '#f39c12', '#e74c3c', '#36A2EB'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+    const budgetChart = new Chart(document.getElementById('budgetChart'), {
+        type: 'bar',
+        data: { labels: budgetLabels, datasets: [{ label: 'Budget Used (%)', data: budgetValues, backgroundColor: ['#ff9f43', '#5856d6', '#28a745', '#e74c3c'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } } }
+    });
+    const lineChart = new Chart(document.getElementById('lineChart'), {
+        type: 'line',
+        data: { labels: carbonLabels, datasets: [{ label: 'CO₂ (kg)', data: carbonValues, borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.1)', fill: true }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+    const seasonalChart = new Chart(document.getElementById('seasonalChart'), {
+        type: 'line',
+        data: { labels: seasonalLabels, datasets: [{ label: 'L/100km', data: seasonalValues, borderColor: '#5856d6', backgroundColor: 'rgba(88, 86, 214, 0.1)', fill: true }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    async function updateDashboard() {
+        try {
+            await fetch('/api/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            const dataRes = await fetch('/api/dashboard-data');
+            const d = await dataRes.json();
+
+            pieChart.data.labels = d.department_labels;
+            pieChart.data.datasets[0].data = d.department_values;
+            pieChart.update();
+
+            budgetChart.data.labels = d.budget_labels;
+            budgetChart.data.datasets[0].data = d.budget_values;
+            budgetChart.update();
+
+            lineChart.data.labels = d.carbon_labels;
+            lineChart.data.datasets[0].data = d.carbon_values;
+            lineChart.update();
+
+            seasonalChart.data.labels = d.seasonal_labels;
+            seasonalChart.data.datasets[0].data = d.seasonal_values;
+            seasonalChart.update();
+
+            document.getElementById('kpi-total-fuel').innerText = d.total_fuel + ' L';
+            document.getElementById('kpi-total-co2').innerText = d.total_co2 + ' kg';
+            document.getElementById('kpi-active-anomalies').innerText = d.active_anomalies;
+            document.getElementById('kpi-top-consumer').innerText = d.top_department_name;
+
+        } catch (error) { console.error('Live update error:', error); }
+    }
+    setInterval(updateDashboard, 10000);
+</script>
+{% endblock %}

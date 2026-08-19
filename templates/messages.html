@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block page_title %}✉️ Messages{% endblock %}
+
+{% block content %}
+<div class="dashboard-card p-0 overflow-hidden d-flex flex-column" style="height: 80vh;">
+    <div class="row g-0 h-100">
+        <!-- User List (Left Sidebar) -->
+        <div class="col-md-4 border-end" style="background-color: #f8f9fa;">
+            <div class="p-3 border-bottom bg-white">
+                <!-- Arama Kutusu -->
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0 rounded-pill rounded-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="contact-search" class="form-control bg-light border-0 rounded-pill rounded-start-0 shadow-sm ps-1" placeholder="Search contacts...">
+                </div>
+            </div>
+            <div class="list-group list-group-flush" id="user-list" style="overflow-y: auto; height: 100%;">
+                <div class="text-center text-muted p-4">Loading contacts...</div>
+            </div>
+        </div>
+
+        <!-- Chat Area (Right Side) -->
+        <div class="col-md-8 d-flex flex-column h-100 position-relative">
+            <div class="p-3 border-bottom bg-white" id="chat-header">
+                <h6 class="mb-0 text-muted">Select a user to start chatting</h6>
+            </div>
+            
+            <div id="chat-messages" class="flex-grow-1 p-3" style="overflow-y: auto; background-color: #f1f5f9;">
+                <div class="text-center text-muted py-5">No conversation selected.</div>
+            </div>
+
+            <div class="p-3 border-top bg-white" id="chat-input-area" style="display: none;">
+                <div class="input-group">
+                    <input type="text" id="message-input" class="form-control rounded-pill me-2" placeholder="Type a message...">
+                    <button class="btn btn-primary rounded-pill px-4" onclick="sendMessage()"><i class="bi bi-send-fill"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let selectedUserId = null;
+    let allUsers = []; // Tüm kullanıcıları hafızada tutacağız
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadUsers();
+        
+        // Arama kutusuna yazı yazıldığında listeyi filtrele
+        document.getElementById('contact-search').addEventListener('keyup', function() {
+            filterUsers(this.value);
+        });
+    });
+
+    function loadUsers() {
+        fetch('/api/users')
+        .then(res => res.json())
+        .then(users => {
+            allUsers = users; // Verileri hafızaya kaydet
+            renderUsers(users); // Listeyi çiz
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('user-list').innerHTML = '<div class="text-danger text-center p-4">Error loading contacts.</div>';
+        });
+    }
+
+    // Arama filtreleme fonksiyonu
+    function filterUsers(searchText) {
+        const filter = searchText.toLowerCase();
+        // Orijinal listeden filtreleme yap
+        const filtered = allUsers.filter(user => {
+            return user.username.toLowerCase().includes(filter) || 
+                   user.role.toLowerCase().includes(filter);
+        });
+        renderUsers(filtered);
+    }
+
+    // Listeyi çizme fonksiyonu
+    function renderUsers(users) {
+        const list = document.getElementById('user-list');
+        list.innerHTML = '';
+        
+        if(users.length === 0) {
+            list.innerHTML = '<div class="text-center text-muted p-4">No contacts found.</div>';
+        } else {
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item list-group-item-action d-flex align-items-center';
+                div.style.cursor = 'pointer';
+                
+                const avatarColor = ['bg-primary', 'bg-success', 'bg-warning', 'bg-danger', 'bg-info'][user.id % 5];
+                const roleDisplay = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+                
+                div.innerHTML = `
+                    <div class="user-avatar ${avatarColor} text-white me-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold;">${user.username[0].toUpperCase()}</div>
+                    <div>
+                        <div class="fw-bold">${user.username}</div>
+                        <small class="text-muted" style="font-size: 0.75rem;"><i class="bi bi-briefcase-fill me-1"></i>${roleDisplay}</small>
+                    </div>
+                `;
+                div.onclick = () => selectUser(user.id, user.username);
+                list.appendChild(div);
+            });
+        }
+    }
+
+    function selectUser(userId, username) {
+        selectedUserId = userId;
+        document.getElementById('chat-header').innerHTML = `<h6 class="mb-0 fw-bold text-dark">${username}</h6>`;
+        document.getElementById('chat-input-area').style.display = 'block';
+        document.getElementById('chat-messages').innerHTML = '<div class="text-center text-muted py-3">Loading messages...</div>';
+        
+        fetch(`/api/messages/${userId}`)
+        .then(res => res.json())
+        .then(messages => {
+            const container = document.getElementById('chat-messages');
+            container.innerHTML = '';
+            if(messages.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted py-5">No messages yet. Start a conversation!</div>';
+            } else {
+                messages.forEach(msg => {
+                    const isMe = msg.sender_id === {{ current_user.id }};
+                    container.innerHTML += `
+                        <div class="d-flex mb-3 ${isMe ? 'justify-content-end' : 'justify-content-start'}">
+                            <div class="p-3 rounded-3 ${isMe ? 'bg-primary text-white' : 'bg-white text-dark border'} shadow-sm" style="max-width: 70%;">
+                                <div>${msg.content}</div>
+                                <small class="${isMe ? 'text-white-50' : 'text-muted'}" style="font-size: 0.7rem;">${msg.created_at}</small>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.scrollTop = container.scrollHeight;
+            }
+        })
+        .catch(err => console.error(err));
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('message-input');
+        const content = input.value.trim();
+        if(!content || !selectedUserId) return;
+
+        fetch('/api/messages/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiver_id: selectedUserId, content: content })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                input.value = '';
+                selectUser(selectedUserId, document.getElementById('chat-header').innerText);
+            }
+        });
+    }
+
+    // Enter tuşu ile mesaj gönderme
+    document.getElementById('message-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+{% endblock %}
