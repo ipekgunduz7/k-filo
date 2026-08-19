@@ -44,14 +44,12 @@
 
 {% endblock %}
 
-<!-- İŞTE EKLENEN KISIM: Sayfa yenilendiğinde switch'i kayıtlı temaya göre ayarlar -->
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const toggle = document.getElementById('darkModeToggle');
         const savedTheme = localStorage.getItem('kfiloTheme');
         
-        // Eğer kayıtlı tema dark ise, switch'i otomatik olarak işaretle (aç)
         if (savedTheme === 'dark') {
             toggle.checked = true;
         } else {

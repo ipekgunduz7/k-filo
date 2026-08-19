@@ -8,7 +8,6 @@
         <!-- User List (Left Sidebar) -->
         <div class="col-md-4 border-end" style="background-color: #f8f9fa;">
             <div class="p-3 border-bottom bg-white">
-                <!-- Arama Kutusu -->
                 <div class="input-group">
                     <span class="input-group-text bg-light border-0 rounded-pill rounded-end-0"><i class="bi bi-search text-muted"></i></span>
                     <input type="text" id="contact-search" class="form-control bg-light border-0 rounded-pill rounded-start-0 shadow-sm ps-1" placeholder="Search contacts...">
@@ -43,12 +42,10 @@
 {% block scripts %}
 <script>
     let selectedUserId = null;
-    let allUsers = []; // Tüm kullanıcıları hafızada tutacağız
+    let allUsers = []; 
 
     document.addEventListener('DOMContentLoaded', function() {
-        loadUsers();
-        
-        // Arama kutusuna yazı yazıldığında listeyi filtrele
+        loadUsers();     
         document.getElementById('contact-search').addEventListener('keyup', function() {
             filterUsers(this.value);
         });
@@ -58,8 +55,8 @@
         fetch('/api/users')
         .then(res => res.json())
         .then(users => {
-            allUsers = users; // Verileri hafızaya kaydet
-            renderUsers(users); // Listeyi çiz
+            allUsers = users; 
+            renderUsers(users); 
         })
         .catch(err => {
             console.error(err);
@@ -157,7 +154,6 @@
         });
     }
 
-    // Enter tuşu ile mesaj gönderme
     document.getElementById('message-input').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') sendMessage();
     });

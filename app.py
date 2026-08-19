@@ -28,7 +28,7 @@ app.config['last_notif_check'] = 0
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# --- BİLDİRİM OLUŞTURMA FONKSİYONU (EKSPERTSİZ ÇALIŞIR) ---
+# --- BİLDİRİM OLUŞTURMA FONKSİYONU ---
 def create_notification(user_id, message):
     try:
         conn = data_loader.get_connection()
@@ -37,13 +37,12 @@ def create_notification(user_id, message):
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Bildirim eklenirken hata: {e}")
+        print(f"Error while sending notification: {e}")
 # ------------------------------------------------------------
 
 @app.route('/')
 @login_required
 def index():
-    # Her değişken için boş/başlangıç değerleri tanımla
     department_df = pd.DataFrame()
     anomalies = pd.DataFrame()
     active_anomalies = 0
@@ -60,8 +59,6 @@ def index():
     total_co2 = 0
     top_department = None
 
-    # Her bir veri çekme işlemini ayrı ayrı dene. 
-    # Sorgulardan biri yavaşlarsa bile sayfa çökmez!
     try:
         department_df = analytics.get_department_fuel_distribution()
     except Exception as e:
@@ -103,7 +100,6 @@ def index():
     except Exception as e:
         print(f"Dashboard Error - get_advanced_anomalies: {e}")
 
-    # ML (Isolation Forest) işlemi en çok takılan kısımdır, onu izole ettik!
     try:
         ml_anomalies = analytics.get_ml_anomalies() or []
     except Exception as e:
@@ -122,7 +118,6 @@ def index():
     except Exception as e:
         print(f"Dashboard Error - get_total_...: {e}")
 
-    # Insights hesaplamaları (DataFrame'ler boşsa hata vermemeli)
     insights = {}
     if not department_df.empty:
         total_fuel_sum = department_df['TotalFuel'].sum()
@@ -265,7 +260,6 @@ def simulate_data():
     try:
         conn = data_loader.get_connection()
         cursor = conn.cursor()
-
         cursor.execute("SELECT TOP 1 VehicleID FROM Vehicle ORDER BY NEWID()")
         vehicle = cursor.fetchone()
         if not vehicle:
@@ -287,9 +281,8 @@ def simulate_data():
     except Exception as e:
         if conn:
             conn.rollback()
-        print(f"Simülasyon Hatası: {e}")
+        print(f"Simulation error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
     finally:
         if conn:
             conn.close()
@@ -298,30 +291,43 @@ def simulate_data():
 @app.route('/api/dashboard-data')
 @login_required
 def api_dashboard_data():
-    dept_df = analytics.get_department_fuel_distribution()
-    budget_df = analytics.get_budget_usage()
-    carbon_df = analytics.get_carbon_footprint()
-    seasonal_df = analytics.get_seasonal_avg_fuel()
-    total_fuel = analytics.get_total_fuel()
-    total_co2 = analytics.get_total_co2()
-    anomalies = analytics.detect_anomalies()
-    active_anomalies = len(anomalies)
-    top_department = analytics.get_top_department()
+    try:
+        dept_df = analytics.get_department_fuel_distribution()
+        budget_df = analytics.get_budget_usage()
+        carbon_df = analytics.get_carbon_footprint()
+        seasonal_df = analytics.get_seasonal_avg_fuel()
+        total_fuel = analytics.get_total_fuel()
+        total_co2 = analytics.get_total_co2()
+        top_department = analytics.get_top_department()
+        
+        active_anomalies = 0
+        try:
+            anomalies = analytics.detect_anomalies()
+            active_anomalies = len(anomalies)
+        except Exception as e:
+            print(f"Dashboard Error - active_anomalies: {e}")
+
+    except Exception as e:
+        print(f"Dashboard Data Error: {e}")
+        dept_df, budget_df, carbon_df, seasonal_df = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        total_fuel, total_co2 = 0, 0
+        top_department = None
+        active_anomalies = 0
+
     return jsonify({
-        'department_labels': dept_df['DepartmentName'].tolist(),
-        'department_values': dept_df['TotalFuel'].tolist(),
-        'budget_labels': budget_df['DepartmentName'].tolist(),
-        'budget_values': budget_df['BudgetUsedPercent'].tolist(),
-        'carbon_labels': [f"{int(row['Month'])}/{int(row['Year'])}" for _, row in carbon_df.iterrows()],
-        'carbon_values': carbon_df['CO2Emission'].tolist(),
-        'seasonal_labels': seasonal_df['MonthLabel'].tolist(),
-        'seasonal_values': seasonal_df['AvgFuelPer100km'].tolist(),
+        'department_labels': dept_df['DepartmentName'].tolist() if not dept_df.empty else [],
+        'department_values': dept_df['TotalFuel'].tolist() if not dept_df.empty else [],
+        'budget_labels': budget_df['DepartmentName'].tolist() if not budget_df.empty else [],
+        'budget_values': budget_df['BudgetUsedPercent'].tolist() if not budget_df.empty else [],
+        'carbon_labels': [f"{int(row['Month'])}/{int(row['Year'])}" for _, row in carbon_df.iterrows()] if not carbon_df.empty else [],
+        'carbon_values': carbon_df['CO2Emission'].tolist() if not carbon_df.empty else [],
+        'seasonal_labels': seasonal_df['MonthLabel'].tolist() if not seasonal_df.empty else [],
+        'seasonal_values': seasonal_df['AvgFuelPer100km'].tolist() if not seasonal_df.empty else [],
         'total_fuel': total_fuel,
         'total_co2': total_co2,
-        'active_anomalies': active_anomalies,
+        'active_anomalies': active_anomalies,  
         'top_department_name': top_department['name'] if top_department else 'N/A'
     })
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -522,7 +528,6 @@ def admin_panel():
         total_departments = len(departments)
         total_users = len(users)
         
-        # Burayı da koruma altına aldık, anomali takılırsa sayfa yine patlamaz.
         try:
             active_anomalies = len(analytics.detect_anomalies())
         except:
@@ -540,8 +545,8 @@ def admin_panel():
                                top_department=top_department,
                                active_anomalies=active_anomalies)
     except Exception as e:
-        print(f"Admin paneli yüklenirken kritik hata: {e}")
-        return "Admin paneli verileri çekilirken bir hata oluştu, terminali kontrol edin.", 500
+        print(f"Critical error while loading admin panel: {e}")
+        return "An error occurred while retrieving admin panel data, check the terminal.", 500
     finally:
         if conn:
             conn.close()
@@ -645,8 +650,6 @@ def admin_delete_user(user_id):
         conn.close()
     return redirect(url_for('admin_panel'))
 
-
-# --- EKSİK ROTALAR ---
 @app.route('/analytics')
 @login_required
 def analytics_page():
@@ -756,4 +759,4 @@ def send_message():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=8080)
