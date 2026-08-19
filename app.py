@@ -15,6 +15,7 @@ from reportlab.lib import colors
 import random
 from datetime import date
 from functools import wraps
+import time
 
 app = Flask(__name__)
 login_manager = LoginManager()
@@ -22,75 +23,132 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 app.config['UPLOAD_FOLDER'] = 'data/uploads'
 app.config['SECRET_KEY'] = 'your-secret-key'
+# Bildirim kontrol zamanı için config değişkeni
+app.config['last_notif_check'] = 0
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
+# --- BİLDİRİM OLUŞTURMA FONKSİYONU (EKSPERTSİZ ÇALIŞIR) ---
+def create_notification(user_id, message):
+    try:
+        conn = data_loader.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO Notification (UserID, Message, IsRead) VALUES (?, ?, 0)", (user_id, message))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Bildirim eklenirken hata: {e}")
+# ------------------------------------------------------------
 
 @app.route('/')
 @login_required
 def index():
-    # Dashboard data
-    department_df = analytics.get_department_fuel_distribution()
-    anomalies = analytics.detect_anomalies()
-    active_anomalies = len(anomalies)
-    carbon_df = analytics.get_carbon_footprint()
-    budget_df = analytics.get_budget_usage()
-    budget_alerts = analytics.get_budget_alerts()
-    seasonal_df = analytics.get_seasonal_avg_fuel()
-    weekday_df = analytics.get_weekday_weekend_analysis()
-    advanced_anomalies = analytics.get_advanced_anomalies()
-    ml_anomalies = analytics.get_ml_anomalies()
-    forecast = analytics.get_fuel_forecast()
-    total_vehicles = analytics.get_total_vehicles()
-    total_fuel = analytics.get_total_fuel()
-    total_co2 = analytics.get_total_co2()
-    top_department = analytics.get_top_department()
+    # Her değişken için boş/başlangıç değerleri tanımla
+    department_df = pd.DataFrame()
+    anomalies = pd.DataFrame()
+    active_anomalies = 0
+    carbon_df = pd.DataFrame()
+    budget_df = pd.DataFrame()
+    budget_alerts = pd.DataFrame()
+    seasonal_df = pd.DataFrame()
+    weekday_df = pd.DataFrame()
+    advanced_anomalies = []
+    ml_anomalies = []
+    forecast = {}
+    total_vehicles = 0
+    total_fuel = 0
+    total_co2 = 0
+    top_department = None
 
-    # Dynamic insights
+    # Her bir veri çekme işlemini ayrı ayrı dene. 
+    # Sorgulardan biri yavaşlarsa bile sayfa çökmez!
+    try:
+        department_df = analytics.get_department_fuel_distribution()
+    except Exception as e:
+        print(f"Dashboard Error - get_department_fuel_distribution: {e}")
+
+    try:
+        anomalies = analytics.detect_anomalies()
+        active_anomalies = len(anomalies)
+    except Exception as e:
+        print(f"Dashboard Error - detect_anomalies: {e}")
+
+    try:
+        carbon_df = analytics.get_carbon_footprint()
+    except Exception as e:
+        print(f"Dashboard Error - get_carbon_footprint: {e}")
+
+    try:
+        budget_df = analytics.get_budget_usage()
+    except Exception as e:
+        print(f"Dashboard Error - get_budget_usage: {e}")
+
+    try:
+        budget_alerts = analytics.get_budget_alerts()
+    except Exception as e:
+        print(f"Dashboard Error - get_budget_alerts: {e}")
+
+    try:
+        seasonal_df = analytics.get_seasonal_avg_fuel()
+    except Exception as e:
+        print(f"Dashboard Error - get_seasonal_avg_fuel: {e}")
+
+    try:
+        weekday_df = analytics.get_weekday_weekend_analysis()
+    except Exception as e:
+        print(f"Dashboard Error - get_weekday_weekend_analysis: {e}")
+
+    try:
+        advanced_anomalies = analytics.get_advanced_anomalies() or []
+    except Exception as e:
+        print(f"Dashboard Error - get_advanced_anomalies: {e}")
+
+    # ML (Isolation Forest) işlemi en çok takılan kısımdır, onu izole ettik!
+    try:
+        ml_anomalies = analytics.get_ml_anomalies() or []
+    except Exception as e:
+        print(f"Dashboard Error - get_ml_anomalies: {e}")
+
+    try:
+        forecast = analytics.get_fuel_forecast() or {}
+    except Exception as e:
+        print(f"Dashboard Error - get_fuel_forecast: {e}")
+
+    try:
+        total_vehicles = analytics.get_total_vehicles() or 0
+        total_fuel = analytics.get_total_fuel() or 0
+        total_co2 = analytics.get_total_co2() or 0
+        top_department = analytics.get_top_department()
+    except Exception as e:
+        print(f"Dashboard Error - get_total_...: {e}")
+
+    # Insights hesaplamaları (DataFrame'ler boşsa hata vermemeli)
     insights = {}
-
     if not department_df.empty:
-        total_fuel = department_df['TotalFuel'].sum()
+        total_fuel_sum = department_df['TotalFuel'].sum()
         top_dept = department_df.iloc[0]
-        insights['pie'] = (
-            f"The highest fuel consumer is {top_dept['DepartmentName']} "
-            f"with {top_dept['TotalFuel']:.0f} liters, representing "
-            f"{top_dept['TotalFuel'] / total_fuel * 100:.1f}% of total fuel consumption."
-        )
-        insights['bar'] = (
-            f"Total fuel consumption across all departments is {total_fuel:.0f} liters. "
-            f"{top_dept['DepartmentName']} has the highest consumption."
-        )
+        insights['pie'] = f"The highest fuel consumer is {top_dept['DepartmentName']} with {top_dept['TotalFuel']:.0f} liters, representing {top_dept['TotalFuel'] / total_fuel_sum * 100:.1f}% of total fuel consumption."
+        insights['bar'] = f"Total fuel consumption across all departments is {total_fuel_sum:.0f} liters. {top_dept['DepartmentName']} has the highest consumption."
     else:
         insights['pie'] = "No data available for department fuel distribution."
         insights['bar'] = "No data available for total fuel consumption."
 
     if not carbon_df.empty:
         latest_carbon = carbon_df.iloc[-1]
-        insights['line'] = (
-            f"Total CO2 emission in {int(latest_carbon['Month'])}/{int(latest_carbon['Year'])} "
-            f"is {latest_carbon['CO2Emission']:.2f} kg."
-        )
+        insights['line'] = f"Total CO2 emission in {int(latest_carbon['Month'])}/{int(latest_carbon['Year'])} is {latest_carbon['CO2Emission']:.2f} kg."
     else:
         insights['line'] = "No carbon footprint data available."
 
     if not budget_df.empty:
         max_budget = budget_df.loc[budget_df['BudgetUsedPercent'].idxmax()]
-        insights['budget'] = (
-            f"{max_budget['DepartmentName']} has the highest budget utilization "
-            f"at {max_budget['BudgetUsedPercent']:.1f}%."
-        )
+        insights['budget'] = f"{max_budget['DepartmentName']} has the highest budget utilization at {max_budget['BudgetUsedPercent']:.1f}%."
     else:
         insights['budget'] = "No budget data available."
 
     if not seasonal_df.empty:
         seasonal_max = seasonal_df.loc[seasonal_df['AvgFuelPer100km'].idxmax()]
         seasonal_min = seasonal_df.loc[seasonal_df['AvgFuelPer100km'].idxmin()]
-        insights['seasonal'] = (
-            f"The highest monthly average fuel consumption is {seasonal_max['AvgFuelPer100km']:.2f} L/100km "
-            f"in {seasonal_max['MonthLabel']}. The lowest is {seasonal_min['AvgFuelPer100km']:.2f} L/100km "
-            f"in {seasonal_min['MonthLabel']}."
-        )
+        insights['seasonal'] = f"The highest monthly average fuel consumption is {seasonal_max['AvgFuelPer100km']:.2f} L/100km in {seasonal_max['MonthLabel']}. The lowest is {seasonal_min['AvgFuelPer100km']:.2f} L/100km in {seasonal_min['MonthLabel']}."
     else:
         insights['seasonal'] = "No seasonal data available."
 
@@ -98,46 +156,38 @@ def index():
         weekday_row = weekday_df[weekday_df['DayType'] == 'Weekday']
         weekend_row = weekday_df[weekday_df['DayType'] == 'Weekend']
         if not weekday_row.empty and not weekend_row.empty:
-            insights['weekday'] = (
-                f"Weekday average fuel consumption is {weekday_row.iloc[0]['AvgFuelPer100km']:.2f} L/100km. "
-                f"Weekend average is {weekend_row.iloc[0]['AvgFuelPer100km']:.2f} L/100km."
-            )
+            insights['weekday'] = f"Weekday average fuel consumption is {weekday_row.iloc[0]['AvgFuelPer100km']:.2f} L/100km. Weekend average is {weekend_row.iloc[0]['AvgFuelPer100km']:.2f} L/100km."
         else:
             insights['weekday'] = "Insufficient weekday/weekend data."
     else:
         insights['weekday'] = "No weekday/weekend data available."
 
-    # Prepare chart data
-    department_labels = department_df['DepartmentName'].tolist()
-    department_values = department_df['TotalFuel'].tolist()
+    # Chart verileri
+    department_labels = department_df['DepartmentName'].tolist() if not department_df.empty else []
+    department_values = department_df['TotalFuel'].tolist() if not department_df.empty else []
 
-    carbon_labels = [f"{int(row['Month'])}/{int(row['Year'])}" for _, row in carbon_df.iterrows()]
-    carbon_values = carbon_df['CO2Emission'].tolist()
+    carbon_labels = [f"{int(row['Month'])}/{int(row['Year'])}" for _, row in carbon_df.iterrows()] if not carbon_df.empty else []
+    carbon_values = carbon_df['CO2Emission'].tolist() if not carbon_df.empty else []
 
-    budget_labels = budget_df['DepartmentName'].tolist()
-    budget_values = budget_df['BudgetUsedPercent'].tolist()
+    budget_labels = budget_df['DepartmentName'].tolist() if not budget_df.empty else []
+    budget_values = budget_df['BudgetUsedPercent'].tolist() if not budget_df.empty else []
 
-    seasonal_labels = seasonal_df['MonthLabel'].tolist()
-    seasonal_values = seasonal_df['AvgFuelPer100km'].tolist()
+    seasonal_labels = seasonal_df['MonthLabel'].tolist() if not seasonal_df.empty else []
+    seasonal_values = seasonal_df['AvgFuelPer100km'].tolist() if not seasonal_df.empty else []
 
-    weekday_labels = weekday_df['DayType'].tolist()
-    weekday_values = weekday_df['AvgFuelPer100km'].tolist()
-
-    total_vehicles = analytics.get_total_vehicles()
-    total_fuel = analytics.get_total_fuel()
-    total_co2 = analytics.get_total_co2()
-    top_department = analytics.get_top_department()
+    weekday_labels = weekday_df['DayType'].tolist() if not weekday_df.empty else []
+    weekday_values = weekday_df['AvgFuelPer100km'].tolist() if not weekday_df.empty else []
 
     return render_template(
         'index.html',
         department_labels=department_labels,
         department_values=department_values,
-        anomalies=anomalies.to_dict('records'),
+        anomalies=anomalies.to_dict('records') if not anomalies.empty else [],
         carbon_labels=carbon_labels,
         carbon_values=carbon_values,
         budget_labels=budget_labels,
         budget_values=budget_values,
-        budget_alerts=budget_alerts.to_dict('records'),
+        budget_alerts=budget_alerts.to_dict('records') if not budget_alerts.empty else [],
         seasonal_labels=seasonal_labels,
         seasonal_values=seasonal_values,
         weekday_labels=weekday_labels,
@@ -146,16 +196,16 @@ def index():
         insights=insights,
         ml_anomalies=ml_anomalies,
         forecast=forecast,
-        total_vehicles = total_vehicles,
-        total_fuel = total_fuel,
-        total_co2 = total_co2,
-        top_department = top_department,
+        total_vehicles=total_vehicles,
+        total_fuel=total_fuel,
+        total_co2=total_co2,
+        top_department=top_department,
         active_anomalies=active_anomalies
     )
 
 
 @app.route('/upload', methods=['GET', 'POST'])
-@login_required 
+@login_required
 def upload():
     if request.method == 'POST':
         file = request.files['file']
@@ -163,21 +213,21 @@ def upload():
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-
             if filename.endswith('.xlsx'):
                 df = pd.read_excel(filepath)
                 csv_path = filepath.replace('.xlsx', '.csv')
                 df.to_csv(csv_path, index=False)
                 filepath = csv_path
-
             data_loader.load_csv_to_db(filepath)
             return redirect(url_for('index'))
     return render_template('upload.html')
+
 
 @app.route('/reports')
 @login_required
 def reports():
     return render_template('reports.html')
+
 
 @app.route('/export')
 def export_excel():
@@ -199,7 +249,6 @@ def export_excel():
         anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
         if advanced_anomalies:
             pd.DataFrame(advanced_anomalies).to_excel(writer, sheet_name='Advanced Anomalies', index=False)
-
     output.seek(0)
     return send_file(
         output,
@@ -208,49 +257,43 @@ def export_excel():
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
+
 @app.route('/api/simulate', methods=['POST'])
 @login_required
 def simulate_data():
-    conn = data_loader.get_connection()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = data_loader.get_connection()
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT TOP 1 VehicleID FROM Vehicle ORDER BY NEWID()")
-    vehicle = cursor.fetchone()
-    if not vehicle:
-        return jsonify({'success': False, 'error': 'No vehicles found'}), 400
+        cursor.execute("SELECT TOP 1 VehicleID FROM Vehicle ORDER BY NEWID()")
+        vehicle = cursor.fetchone()
+        if not vehicle:
+            return jsonify({'success': False, 'error': 'No vehicles found'}), 400
 
-    vehicle_id = vehicle[0]
-    usage_date = date.today()
-    daily_km = round(random.uniform(40, 300), 2)
-    fuel_liters = round((daily_km / 100) * random.uniform(8, 15), 2)
+        vehicle_id = vehicle[0]
+        usage_date = date.today()
+        daily_km = round(random.uniform(40, 300), 2)
+        fuel_liters = round((daily_km / 100) * random.uniform(8, 15), 2)
 
-    cursor.execute("""
-        INSERT INTO VehicleUsage (VehicleID, UsageDate, DailyKM, FuelLiters)
-        VALUES (?, ?, ?, ?)
-    """, vehicle_id, usage_date, daily_km, fuel_liters)
-    
-    # --- GERÇEK VERİYE DAYALI BİLDİRİMLER (İngilizce) ---
-    anomalies = analytics.detect_anomalies()
-    if not anomalies.empty:
-        worst_anomaly = anomalies.iloc[0]
-        create_notification(current_user.id, 
-            f"🚨 Alert: Vehicle {worst_anomaly['PlateNumber']} ({worst_anomaly['DepartmentName']}) is consuming "
-            f"{worst_anomaly['DeviationPercent']:.1f}% more fuel than standard!"
-        )
-    
-    budget_alerts = analytics.get_budget_alerts()
-    if not budget_alerts.empty:
-        worst_budget = budget_alerts.iloc[0]
-        create_notification(current_user.id, 
-            f"💰 Budget Alert: {worst_budget['DepartmentName']} department has used "
-            f"{worst_budget['BudgetUsedPercent']:.1f}% of its budget!"
-        )
-    # ---------------------------------------------------
-    
-    conn.commit()
-    conn.close()
+        cursor.execute("""
+            INSERT INTO VehicleUsage (VehicleID, UsageDate, DailyKM, FuelLiters)
+            VALUES (?, ?, ?, ?)
+        """, vehicle_id, usage_date, daily_km, fuel_liters)
 
-    return jsonify({'success': True, 'daily_km': daily_km, 'fuel_liters': fuel_liters})
+        conn.commit()
+        return jsonify({'success': True, 'daily_km': daily_km, 'fuel_liters': fuel_liters})
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Simülasyon Hatası: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    finally:
+        if conn:
+            conn.close()
+
 
 @app.route('/api/dashboard-data')
 @login_required
@@ -259,14 +302,11 @@ def api_dashboard_data():
     budget_df = analytics.get_budget_usage()
     carbon_df = analytics.get_carbon_footprint()
     seasonal_df = analytics.get_seasonal_avg_fuel()
-
-    # Canlı KPI verilerini de API'ye ekle
     total_fuel = analytics.get_total_fuel()
     total_co2 = analytics.get_total_co2()
     anomalies = analytics.detect_anomalies()
     active_anomalies = len(anomalies)
     top_department = analytics.get_top_department()
-
     return jsonify({
         'department_labels': dept_df['DepartmentName'].tolist(),
         'department_values': dept_df['TotalFuel'].tolist(),
@@ -276,32 +316,29 @@ def api_dashboard_data():
         'carbon_values': carbon_df['CO2Emission'].tolist(),
         'seasonal_labels': seasonal_df['MonthLabel'].tolist(),
         'seasonal_values': seasonal_df['AvgFuelPer100km'].tolist(),
-        # KPI değerleri
         'total_fuel': total_fuel,
         'total_co2': total_co2,
         'active_anomalies': active_anomalies,
         'top_department_name': top_department['name'] if top_department else 'N/A'
     })
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
         conn = data_loader.get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT UserID, Username, PasswordHash, Role, DepartmentID FROM [User] WHERE Username = ?", username)
         row = cursor.fetchone()
         conn.close()
-        
         if row and check_password_hash(row[2], password):
             user = User(row[0], row[1], row[3], row[4])
             login_user(user)
             return redirect(url_for('index'))
         else:
             return render_template('login.html', error='Invalid username or password.')
-    
     return render_template('login.html')
 
 
@@ -310,6 +347,7 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
 
 @app.route('/vehicles')
 @login_required
@@ -325,13 +363,12 @@ def vehicles():
     conn.close()
     return render_template('vehicles.html', vehicles=df.to_dict('records'))
 
+
 @app.route('/vehicle/<int:vehicle_id>')
 @login_required
 def vehicle_detail(vehicle_id):
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    
-    # Araç bilgilerini çek
     cursor.execute("""
         SELECT v.PlateNumber, v.Brand, v.Model, d.DepartmentName
         FROM Vehicle v 
@@ -339,11 +376,8 @@ def vehicle_detail(vehicle_id):
         WHERE v.VehicleID = ?
     """, vehicle_id)
     info = cursor.fetchone()
-    
     if not info:
         return "Vehicle not found", 404
-        
-    # Kullanım geçmişini çek
     cursor.execute("""
         SELECT UsageDate, DailyKM, FuelLiters, 
                (FuelLiters / NULLIF(DailyKM, 0)) * 100 AS L100
@@ -353,7 +387,6 @@ def vehicle_detail(vehicle_id):
     """, vehicle_id)
     rows = cursor.fetchall()
     conn.close()
-    
     vehicle_info = {
         'PlateNumber': info[0], 
         'Brand': info[1], 
@@ -366,10 +399,7 @@ def vehicle_detail(vehicle_id):
         'FuelLiters': r[2], 
         'L100': round(float(r[3]), 2) if r[3] else 0
     } for r in rows]
-    
-    return render_template('vehicle_detail.html', 
-                           vehicle=vehicle_info, 
-                           usage_data=usage_data)
+    return render_template('vehicle_detail.html', vehicle=vehicle_info, usage_data=usage_data)
 
 
 class User(UserMixin):
@@ -391,6 +421,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 @login_manager.user_loader
 def load_user(user_id):
     conn = data_loader.get_connection()
@@ -402,12 +433,13 @@ def load_user(user_id):
         return User(row[0], row[1], row[2], row[3])
     return None
 
-# ---------- REST API ENDPOINTS ----------
+
 @app.route('/api/departments')
 @login_required
 def api_departments():
     df = analytics.get_department_fuel_distribution()
     return jsonify(df.to_dict('records'))
+
 
 @app.route('/api/anomalies')
 @login_required
@@ -415,13 +447,14 @@ def api_anomalies():
     df = analytics.detect_anomalies()
     return jsonify(df.to_dict('records'))
 
+
 @app.route('/api/forecast')
 @login_required
 def api_forecast():
     forecast = analytics.get_fuel_forecast()
     return jsonify(forecast)
 
-# ---------- PDF REPORT ----------
+
 @app.route('/download-pdf')
 @login_required
 def download_pdf():
@@ -436,8 +469,6 @@ def download_pdf():
 
     story.append(Paragraph("K-FILO Fleet Analysis Report", styles['Heading1']))
     story.append(Spacer(1, 12))
-
-    # Department Table
     story.append(Paragraph("Fuel Consumption by Department", styles['Heading2']))
     if not dept_df.empty:
         table_data = [dept_df.columns.tolist()] + dept_df.values.tolist()
@@ -453,8 +484,6 @@ def download_pdf():
         ]))
         story.append(t)
         story.append(Spacer(1, 12))
-
-    # Anomalies
     story.append(Paragraph("Anomalies Detected", styles['Heading2']))
     if not anomalies.empty:
         for _, row in anomalies.iterrows():
@@ -462,62 +491,60 @@ def download_pdf():
     else:
         story.append(Paragraph("No anomalies found.", styles['Normal']))
     story.append(Spacer(1, 12))
-
-    # Forecast
     if forecast:
         story.append(Paragraph("Fuel Forecast", styles['Heading2']))
         story.append(Paragraph(f"Predicted consumption for {forecast['next_month']}: {forecast['predicted_fuel']:.2f} liters ({forecast['trend']} trend).", styles['Normal']))
-
     doc.build(story)
     output.seek(0)
     return send_file(output, as_attachment=True, download_name='K_FILO_Report.pdf', mimetype='application/pdf')
+
 
 @app.route('/admin')
 @login_required
 @admin_required
 def admin_panel():
-    conn = data_loader.get_connection()
-    cursor = conn.cursor()
-
-    # Users
-    cursor.execute("SELECT UserID, Username, Role, DepartmentID FROM [User]")
-    users = [{'UserID': r[0], 'Username': r[1], 'Role': r[2], 'DepartmentID': r[3]} for r in cursor.fetchall()]
-
-    # Departments
-    cursor.execute("SELECT DepartmentID, DepartmentName, Budget FROM Department")
-    departments = [{'DepartmentID': r[0], 'DepartmentName': r[1], 'Budget': r[2]} for r in cursor.fetchall()]
-
-    # Vehicles
-    cursor.execute("""
-        SELECT v.VehicleID, v.PlateNumber, v.Brand, v.Model, d.DepartmentName
-        FROM Vehicle v
-        LEFT JOIN Department d ON v.DepartmentID = d.DepartmentID
-        ORDER BY v.PlateNumber
-    """)
-    vehicles = [{'VehicleID': r[0], 'PlateNumber': r[1], 'Brand': r[2], 'Model': r[3], 'DepartmentName': r[4] or 'N/A'} for r in cursor.fetchall()]
-
-    # Stats
-    total_vehicles = len(vehicles)
-    total_departments = len(departments)
-    total_users = len(users)
-    
-    # --- BURASI DÜZELTİLDİ ---
-    # Anomalies direkt analytics'ten çekiliyor, eksik değişken hatası yok!
-    active_anomalies = len(analytics.detect_anomalies())
-    # ---------------------------
-
-    top_department = analytics.get_top_department()
-    conn.close()
-
-    return render_template('admin.html',
-                           users=users,
-                           departments=departments,
-                           vehicles=vehicles,
-                           total_vehicles=total_vehicles,
-                           total_departments=total_departments,
-                           total_users=total_users,
-                           top_department=top_department,
-                           active_anomalies=active_anomalies)
+    conn = None
+    try:
+        conn = data_loader.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT UserID, Username, Role, DepartmentID FROM [User]")
+        users = [{'UserID': r[0], 'Username': r[1], 'Role': r[2], 'DepartmentID': r[3]} for r in cursor.fetchall()]
+        cursor.execute("SELECT DepartmentID, DepartmentName, Budget FROM Department")
+        departments = [{'DepartmentID': r[0], 'DepartmentName': r[1], 'Budget': r[2]} for r in cursor.fetchall()]
+        cursor.execute("""
+            SELECT v.VehicleID, v.PlateNumber, v.Brand, v.Model, d.DepartmentName
+            FROM Vehicle v
+            LEFT JOIN Department d ON v.DepartmentID = d.DepartmentID
+            ORDER BY v.PlateNumber
+        """)
+        vehicles = [{'VehicleID': r[0], 'PlateNumber': r[1], 'Brand': r[2], 'Model': r[3], 'DepartmentName': r[4] or 'N/A'} for r in cursor.fetchall()]
+        total_vehicles = len(vehicles)
+        total_departments = len(departments)
+        total_users = len(users)
+        
+        # Burayı da koruma altına aldık, anomali takılırsa sayfa yine patlamaz.
+        try:
+            active_anomalies = len(analytics.detect_anomalies())
+        except:
+            active_anomalies = 0
+            
+        top_department = analytics.get_top_department()
+        
+        return render_template('admin.html',
+                               users=users,
+                               departments=departments,
+                               vehicles=vehicles,
+                               total_vehicles=total_vehicles,
+                               total_departments=total_departments,
+                               total_users=total_users,
+                               top_department=top_department,
+                               active_anomalies=active_anomalies)
+    except Exception as e:
+        print(f"Admin paneli yüklenirken kritik hata: {e}")
+        return "Admin paneli verileri çekilirken bir hata oluştu, terminali kontrol edin.", 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/admin/add-department', methods=['POST'])
 @login_required
@@ -532,6 +559,7 @@ def admin_add_department():
     conn.close()
     return redirect(url_for('admin_panel'))
 
+
 @app.route('/admin/delete-department/<int:dept_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -542,6 +570,7 @@ def admin_delete_department(dept_id):
     conn.commit()
     conn.close()
     return redirect(url_for('admin_panel'))
+
 
 @app.route('/admin/add-vehicle', methods=['POST'])
 @login_required
@@ -562,6 +591,7 @@ def admin_add_vehicle():
     conn.close()
     return redirect(url_for('admin_panel'))
 
+
 @app.route('/admin/delete-vehicle/<int:vehicle_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -573,6 +603,7 @@ def admin_delete_vehicle(vehicle_id):
     conn.close()
     return redirect(url_for('admin_panel'))
 
+
 @app.route('/admin/add', methods=['POST'])
 @login_required
 @admin_required
@@ -581,20 +612,15 @@ def admin_add_user():
     password = request.form['password']
     role = request.form['role']
     dept_id = request.form.get('department_id')
-    
-    # Eğer müdürlük seçilmediyse NULL yap
     if dept_id == '':
         dept_id = None
-
     hashed_pw = generate_password_hash(password)
-    
     conn = data_loader.get_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO [User] (Username, PasswordHash, Role, DepartmentID) VALUES (?, ?, ?, ?)",
                    username, hashed_pw, role, dept_id)
     conn.commit()
     conn.close()
-    
     return redirect(url_for('admin_panel'))
 
 
@@ -604,44 +630,49 @@ def admin_add_user():
 def admin_delete_user(user_id):
     if user_id == int(current_user.id):
         return "You cannot delete yourself.", 400
-        
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM [User] WHERE UserID = ?", user_id)
-    conn.commit()
-    conn.close()
-    
+    try:
+        cursor.execute("DELETE FROM Notification WHERE UserID = ?", user_id)
+        cursor.execute("DELETE FROM Message WHERE SenderID = ? OR ReceiverID = ?", user_id, user_id)
+        cursor.execute("DELETE FROM [User] WHERE UserID = ?", user_id)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Hata: {e}")
+        return "An error occurred while deleting the user.", 500
+    finally:
+        conn.close()
     return redirect(url_for('admin_panel'))
 
-# --- EKSİK OLAN ROTALARI EKLE (DÜZELTİLDİ) ---
+
+# --- EKSİK ROTALAR ---
 @app.route('/analytics')
 @login_required
 def analytics_page():
-    # Fonksiyon adı 'analytics_page' olarak değiştirildi. 'analytics' modülü ezilmiyor!
     return redirect(url_for('reports'))
+
 
 @app.route('/messages')
 @login_required
 def messages():
     return render_template('messages.html')
 
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
     if request.method == 'POST':
-        # İleride şifre değiştirme fonksiyonu buraya yazılacak
         return redirect(url_for('settings'))
     return render_template('settings.html')
 
-# --- BİLDİRİM SİSTEMİ ROTALARI ---
 
+# --- BİLDİRİM SİSTEMİ API ---
 @app.route('/api/notifications')
 @login_required
 def get_notifications():
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    
-    # Kullanıcının okunmamış bildirimlerini çek
     cursor.execute("""
         SELECT NotificationID, Message, IsRead, CreatedAt 
         FROM Notification 
@@ -649,17 +680,13 @@ def get_notifications():
         ORDER BY CreatedAt DESC
     """, (current_user.id,))
     rows = cursor.fetchall()
-    
-    # Okunmamış sayısını hesapla
     unread_count = sum(1 for r in rows if not r[2])
-    
     notif_list = [{
         'id': r[0], 
         'message': r[1], 
         'is_read': r[2], 
-        'created_at': r[3].strftime('%d/%m/%Y %H:%M') if r[3] else ''
+        'created_at': r[3].strftime('%H:%M') if r[3] else ''
     } for r in rows]
-    
     conn.close()
     return jsonify({'notifications': notif_list, 'unread_count': unread_count})
 
@@ -669,44 +696,29 @@ def get_notifications():
 def mark_notifications_read():
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    
-    # Kullanıcının tüm bildirimlerini okundu olarak işaretle
-    cursor.execute("""
-        UPDATE Notification 
-        SET IsRead = 1 
-        WHERE UserID = ?
-    """, (current_user.id,))
+    cursor.execute("UPDATE Notification SET IsRead = 1 WHERE UserID = ?", (current_user.id,))
     conn.commit()
     conn.close()
-    
     return jsonify({'success': True})
 
-# --- BİLDİRİM ÜRETME YARDIMCI FONKSİYONU ---
-def create_notification(user_id, message):
-    conn = data_loader.get_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO Notification (UserID, Message, IsRead) VALUES (?, ?, 0)", (user_id, message))
-    conn.commit()
-    conn.close()
 
-# --- MESAJLAŞMA SİSTEMİ ROTALARI ---
+# --- MESAJLAŞMA SİSTEMİ API ---
 @app.route('/api/users')
 @login_required
 def api_users():
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    # Kendisi hariç tüm kullanıcıları listele
     cursor.execute("SELECT UserID, Username, Role FROM [User] WHERE UserID != ?", (current_user.id,))
     users = [{'id': r[0], 'username': r[1], 'role': r[2]} for r in cursor.fetchall()]
     conn.close()
     return jsonify(users)
+
 
 @app.route('/api/messages/<int:user_id>')
 @login_required
 def get_messages(user_id):
     conn = data_loader.get_connection()
     cursor = conn.cursor()
-    # Gönderen ve Alıcı arasındaki tüm mesajları getir
     cursor.execute("""
         SELECT SenderID, Content, CreatedAt 
         FROM Message 
@@ -714,18 +726,16 @@ def get_messages(user_id):
         ORDER BY CreatedAt ASC
     """, (current_user.id, user_id, user_id, current_user.id))
     rows = cursor.fetchall()
-    
     messages = [{
         'sender_id': r[0],
         'content': r[1],
         'created_at': r[2].strftime('%H:%M')
     } for r in rows]
-    
-    # Mesajlar okundu olarak işaretlensin
     cursor.execute("UPDATE Message SET IsRead = 1 WHERE SenderID = ? AND ReceiverID = ?", (user_id, current_user.id))
     conn.commit()
     conn.close()
     return jsonify(messages)
+
 
 @app.route('/api/messages/send', methods=['POST'])
 @login_required
@@ -733,20 +743,17 @@ def send_message():
     data = request.json
     receiver_id = data.get('receiver_id')
     content = data.get('content')
-    
     if not receiver_id or not content:
         return jsonify({'success': False, 'error': 'Missing data'}), 400
-
     conn = data_loader.get_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO Message (SenderID, ReceiverID, Content) VALUES (?, ?, ?)", 
                    (current_user.id, receiver_id, content))
     conn.commit()
     conn.close()
-    
     create_notification(receiver_id, f"💬 New message from {current_user.username}")
-    
     return jsonify({'success': True})
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,45 +3,44 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- KPI Cards (Canlı güncellenmesi için id'ler eklendi) -->
-<div class="row g-3 mb-4">
-    <div class="col-xl-3 col-md-6">
+<div class="row mb-4">
+    <div class="col-md-3 mb-2">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <span class="text-muted small">Total Fuel</span>
-                    <h3 id="kpi-total-fuel">{{ total_fuel }} L</h3>
+                    <h3 id="kpi-total-fuel">{{ total_fuel|round|int }} L</h3>
                     <span class="badge-trend"><i class="bi bi-arrow-up-short"></i> +2.5%</span>
                 </div>
                 <div class="icon-box bg-green"><i class="bi bi-fuel-pump-fill"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6">
+    <div class="col-md-3 mb-2">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <span class="text-muted small">CO₂ Emission</span>
-                    <h3 id="kpi-total-co2">{{ total_co2 }} kg</h3>
+                    <h3 id="kpi-total-co2">{{ total_co2|round|int }} kg</h3>
                     <span class="badge-trend"><i class="bi bi-arrow-down-short"></i> -0.8%</span>
                 </div>
                 <div class="icon-box bg-pink"><i class="bi bi-cloud-fill"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6">
+    <div class="col-md-3 mb-2">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <span class="text-muted small">Active Anomalies</span>
                     <h3 id="kpi-active-anomalies">{{ active_anomalies }}</h3>
-                    <span class="badge-trend bg-warning bg-opacity-25 text-warning"><i class="bi bi-exclamation-triangle-fill"></i> High</span>
+                    <span class="badge-trend bg-warning"><i class="bi bi-exclamation-triangle-fill"></i> High</span>
                 </div>
                 <div class="icon-box bg-orange"><i class="bi bi-shield-exclamation"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6">
+    <div class="col-md-3 mb-2">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -55,8 +54,7 @@
     </div>
 </div>
 
-<!-- AI & ML Insights -->
-<div class="row g-3 mb-4">
+<div class="row mb-4">
     <div class="col-md-6">
         <div class="dashboard-card p-3">
             <h6><i class="bi bi-magic text-primary me-2"></i>AI Fuel Forecast</h6>
@@ -86,15 +84,20 @@
     </div>
 </div>
 
-<!-- Tabs: Anomaly / Budget / Advanced -->
-<div class="dashboard-card mb-4 p-0 overflow-hidden">
-    <ul class="nav nav-tabs px-3 pt-3 border-0" id="anomalyTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#standard">🚨 Waste Alerts</button></li>
-        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#budget">💰 Budget Alerts</button></li>
-        <li class="nav-item"><button class="nav-link bg-transparent border-0 fw-semibold" data-bs-toggle="tab" data-bs-target="#advanced">📈 Advanced</button></li>
-    </ul>
-    <div class="tab-content p-3" id="anomalyTabsContent">
-        <div class="tab-pane fade show active" id="standard">
+<ul class="nav nav-tabs mb-3" id="anomalyTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="standard-tab" data-bs-toggle="tab" data-bs-target="#standard" type="button" role="tab">🚨 Waste Alerts</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="budget-tab" data-bs-toggle="tab" data-bs-target="#budget" type="button" role="tab">💰 Budget Alerts</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">📈 Advanced</button>
+    </li>
+</ul>
+<div class="tab-content mb-4" id="anomalyTabsContent">
+    <div class="tab-pane fade show active" id="standard" role="tabpanel">
+        <div class="dashboard-card p-3">
             <div class="table-responsive">
                 <table class="table table-modern mb-0">
                     <thead><tr><th>Plate</th><th>Department</th><th>Deviation</th></tr></thead>
@@ -106,7 +109,9 @@
                 </table>
             </div>
         </div>
-        <div class="tab-pane fade" id="budget">
+    </div>
+    <div class="tab-pane fade" id="budget" role="tabpanel">
+        <div class="dashboard-card p-3">
             <div class="table-responsive">
                 <table class="table table-modern mb-0">
                     <thead><tr><th>Department</th><th>Budget Used</th></tr></thead>
@@ -118,7 +123,9 @@
                 </table>
             </div>
         </div>
-        <div class="tab-pane fade" id="advanced">
+    </div>
+    <div class="tab-pane fade" id="advanced" role="tabpanel">
+        <div class="dashboard-card p-3">
             <div class="table-responsive">
                 <table class="table table-modern mb-0">
                     <thead><tr><th>Plate</th><th>Department</th><th>Change</th></tr></thead>
@@ -133,39 +140,38 @@
     </div>
 </div>
 
-<!-- Charts - 2x2 Grid -->
-<div class="row g-3">
-    <div class="col-lg-6">
-        <div class="dashboard-card">
-            <h6>Fuel by Department</h6>
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card p-3">
+            <h6 class="mb-3">Fuel by Department</h6>
             <div class="chart-container"><canvas id="pieChart"></canvas></div>
-            <div class="insight-text mt-2 text-muted small">{{ insights.pie }}</div>
+            <div class="insight-text">{{ insights.pie }}</div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div class="dashboard-card">
-            <h6>Budget Utilization</h6>
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card p-3">
+            <h6 class="mb-3">Budget Utilization</h6>
             <div class="chart-container"><canvas id="budgetChart"></canvas></div>
-            <div class="insight-text mt-2 text-muted small">{{ insights.budget }}</div>
+            <div class="insight-text">{{ insights.budget }}</div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div class="dashboard-card">
-            <h6>Monthly CO₂ Emission</h6>
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card p-3">
+            <h6 class="mb-3">Monthly CO₂ Emission</h6>
             <div class="chart-container"><canvas id="lineChart"></canvas></div>
-            <div class="insight-text mt-2 text-muted small">{{ insights.line }}</div>
+            <div class="insight-text">{{ insights.line }}</div>
         </div>
     </div>
-    <div class="col-lg-6">
-        <div class="dashboard-card">
-            <h6>Seasonal Fuel Trend</h6>
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card p-3">
+            <h6 class="mb-3">Seasonal Fuel Trend</h6>
             <div class="chart-container"><canvas id="seasonalChart"></canvas></div>
-            <div class="insight-text mt-2 text-muted small">{{ insights.seasonal }}</div>
+            <div class="insight-text">{{ insights.seasonal }}</div>
         </div>
     </div>
 </div>
 
-<div class="d-flex justify-content-end gap-2 mt-4">
+<div class="d-flex justify-content-end gap-2 mt-2">
     <a href="/export" class="btn btn-success btn-sm rounded-pill px-4"><i class="bi bi-file-earmark-excel"></i> Excel</a>
     <a href="/download-pdf" class="btn btn-danger btn-sm rounded-pill px-4"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
 </div>
@@ -189,17 +195,17 @@
     });
     const budgetChart = new Chart(document.getElementById('budgetChart'), {
         type: 'bar',
-        data: { labels: budgetLabels, datasets: [{ label: 'Budget Used (%)', data: budgetValues, backgroundColor: ['#ff9f43', '#5856d6', '#28a745', '#e74c3c'] }] },
+        data: { labels: budgetLabels, datasets: [{ label: 'Budget Used (%)', data: budgetValues, backgroundColor: '#FF9F40' }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } } }
     });
     const lineChart = new Chart(document.getElementById('lineChart'), {
         type: 'line',
-        data: { labels: carbonLabels, datasets: [{ label: 'CO₂ (kg)', data: carbonValues, borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.1)', fill: true }] },
+        data: { labels: carbonLabels, datasets: [{ label: 'CO₂ (kg)', data: carbonValues, borderColor: '#FF6384', fill: false }] },
         options: { responsive: true, maintainAspectRatio: false }
     });
     const seasonalChart = new Chart(document.getElementById('seasonalChart'), {
         type: 'line',
-        data: { labels: seasonalLabels, datasets: [{ label: 'L/100km', data: seasonalValues, borderColor: '#5856d6', backgroundColor: 'rgba(88, 86, 214, 0.1)', fill: true }] },
+        data: { labels: seasonalLabels, datasets: [{ label: 'L/100km', data: seasonalValues, borderColor: '#36A2EB', backgroundColor: 'rgba(54,162,235,0.2)', fill: true }] },
         options: { responsive: true, maintainAspectRatio: false }
     });
 
