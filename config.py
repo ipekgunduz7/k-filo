@@ -1,3 +1,5 @@
-DB_SERVER = 'i'
+DB_SERVER = 'localhost'
 DB_NAME = 'FiloDB'
 DB_DRIVER = 'ODBC Driver 17 for SQL Server'
+DB_USER = 'i'
+DB_PASSWORD = 'YOUR_SQL_PASSWORD_HERE' 
