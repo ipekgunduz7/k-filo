@@ -19,4 +19,9 @@ A modern, responsive fleet management dashboard built with Flask, Bootstrap 5, a
 - **Frontend:** Bootstrap 5, Chart.js, Jinja2
 - **Data Processing:** Pandas, Scikit-learn (Isolation Forest, Linear Regression)
 
+## 🚀 Installation & Setup
 
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/ipekgunduz7/k-filo.git
+   cd k-filo
