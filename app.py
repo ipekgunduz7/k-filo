@@ -253,7 +253,7 @@ def export_excel():
     )
 
 
-@app.route('/api/simulate', methods=['POST'])
+@app.route('/api/simulate', methods=['POST']) 
 @login_required
 def simulate_data():
     conn = None
@@ -274,8 +274,28 @@ def simulate_data():
             INSERT INTO VehicleUsage (VehicleID, UsageDate, DailyKM, FuelLiters)
             VALUES (?, ?, ?, ?)
         """, vehicle_id, usage_date, daily_km, fuel_liters)
-
         conn.commit()
+
+        try:
+            anomalies = analytics.detect_anomalies()
+            if not anomalies.empty:
+                worst_anomaly = anomalies.iloc[0]
+                create_notification(current_user.id, 
+                    f"🚨 Alert: Vehicle {worst_anomaly['PlateNumber']} ({worst_anomaly['DepartmentName']}) is consuming "
+                    f"{worst_anomaly['DeviationPercent']:.1f}% more fuel than standard!"
+                )
+            
+            budget_alerts = analytics.get_budget_alerts()
+            if not budget_alerts.empty:
+                worst_budget = budget_alerts.iloc[0]
+                create_notification(current_user.id, 
+                    f"💰 Budget Alert: {worst_budget['DepartmentName']} department has used "
+                    f"{worst_budget['BudgetUsedPercent']:.1f}% of its budget!"
+                )
+        except Exception as e:
+           Notification check error (only logged to terminal): {e}")
+        # ---------------------------------------------------
+
         return jsonify({'success': True, 'daily_km': daily_km, 'fuel_liters': fuel_liters})
 
     except Exception as e:
@@ -286,7 +306,6 @@ def simulate_data():
     finally:
         if conn:
             conn.close()
-
 
 @app.route('/api/dashboard-data')
 @login_required
