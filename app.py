@@ -293,7 +293,7 @@ def simulate_data():
                     f"{worst_budget['BudgetUsedPercent']:.1f}% of its budget!"
                 )
         except Exception as e:
-           Notification check error (only logged to terminal): {e}")
+           print(f"Notification check error (only logged to terminal): {e}")
         # ---------------------------------------------------
 
         return jsonify({'success': True, 'daily_km': daily_km, 'fuel_liters': fuel_liters})

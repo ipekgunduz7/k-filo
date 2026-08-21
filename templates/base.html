@@ -140,7 +140,11 @@
             loadNotifications();
             
             document.querySelector('.dropdown .btn-link').addEventListener('click', function() {
+                const dot = document.getElementById('notif-dot');
+                if (dot) dot.style.display = 'none';
+
                 fetch('/api/notifications/read', { method: 'POST' });
+
             });
         });
 
